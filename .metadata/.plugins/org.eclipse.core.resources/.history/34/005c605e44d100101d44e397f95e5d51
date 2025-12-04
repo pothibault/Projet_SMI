@@ -102,8 +102,8 @@ const osMutexAttr_t BlinkTurnMutex_attributes = {
 extern float humidity = 60.0f; // updated by your I2C task
 //#define PWM_1V   19800
 //#define PWM_2V   39700
-#define PWM_1V   27500
-#define PWM_2V   55000
+#define PWM_1V   21845
+#define PWM_2V   43690
 #define HUMIDITY_THRESHOLD 40.0f  // choose your switch point
 
 
