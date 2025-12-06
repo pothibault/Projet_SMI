@@ -156,6 +156,57 @@ void CallbackRunTimer(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void floatToChar(float value, char *buffer)
+{
+    int integerPart;
+    int decimalPart;
+
+    // Gestion du signe
+    if (value < 0)
+    {
+        *buffer++ = '-';
+        value = -value;
+    }
+
+    // Partie entière
+    integerPart = (int)value;
+
+    // Partie décimale (2 chiffres)
+    decimalPart = (int)((value - integerPart) * 100);
+
+    // Conversion partie entière
+    int i = 0;
+    char temp[10];
+
+    if (integerPart == 0)
+    {
+        temp[i++] = '0';
+    }
+    else
+    {
+        while (integerPart > 0)
+        {
+            temp[i++] = (integerPart % 10) + '0';
+            integerPart /= 10;
+        }
+    }
+
+    // Inverser (car on a construit à l’envers)
+    for (int j = i - 1; j >= 0; j--)
+    {
+        *buffer++ = temp[j];
+    }
+
+    // Point décimal
+    *buffer++ = '.';
+
+    // Décimales (toujours 2 chiffres)
+    *buffer++ = (decimalPart / 10) + '0';
+    *buffer++ = (decimalPart % 10) + '0';
+    *buffer++ = '%';
+    // Fin de chaîne
+    *buffer = '\0';
+}
 
 /* USER CODE END 0 */
 
@@ -547,7 +598,7 @@ void StartSetPWM(void *argument)
 	    /* Force initial output = 1V */
 	    TIM4->CCR1 = PWM_1V;
 
-	    const uint32_t UPDATE_INTERVAL = 10000; // 15 minutes in ms
+	    const uint32_t UPDATE_INTERVAL = 20000; // 15 minutes in ms
 	    static uint32_t lastUpdate = 0;
 
 	    for (;;)
@@ -650,7 +701,7 @@ void StartSetLCDState(void *argument)
         }
 
         //Formater en texte "xx.x%"
-        snprintf(humidityText, sizeof(humidityText), "%.1f%%", localHumidity);
+        floatToChar(humidity, humidityText);
 
         //Afficher le texte et la barre
         AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
