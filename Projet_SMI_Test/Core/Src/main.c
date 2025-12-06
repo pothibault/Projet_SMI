@@ -19,6 +19,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "am2320.h"
+#include "i2c.h"
 #include <stm32f4xx.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -549,10 +551,21 @@ void StartSetPWM(void *argument)
 void StartReadHumidity(void *argument)
 {
   /* USER CODE BEGIN StartReadHumidity */
-  /* Infinite loop */
+  am2320_data_t meas;
+
   for(;;)
   {
-    osDelay(1);
+    if (am2320_read(&meas)) {
+
+    	float humidity_read = meas.humidity_rh;
+		float temperature = meas.temperature_c;
+		humidity = humidity_read;
+		osDelay(2000);
+      // TODO : stocker meas.temperature_c et meas.humidity_rh
+      // par exemple dans des variables globales protégées par un mutex,
+      // ou les envoyer dans une queue à une autre tâche qui gère l’affichage.
+    }
+
   }
   /* USER CODE END StartReadHumidity */
 }

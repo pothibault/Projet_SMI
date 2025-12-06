@@ -34,12 +34,12 @@ void SPI_Transmit(uint8_t *frame_buffer_bytes, int ILI93nbr_byte){
 	        // Attendre que le buffer soit vide
 	        while (!(SPI5->SR & SPI_SR_TXE));
 
-	        // Écrire l'octet
+	        // ï¿½crire l'octet
 	        SPI5->DR = frame_buffer_bytes[i];
 
 	        status_spi = SPI5->SR;
 
-	        // Attendre que la transmission soit vraiment finie (shift register vidé)
+	        // Attendre que la transmission soit vraiment finie (shift register vidï¿½)
 	        while (SPI5->SR & SPI_SR_BSY);
 
 	        status_spi = SPI5->SR;
@@ -60,8 +60,8 @@ void LCD_InitSerialInterface(void)
 	//SOFTWARE RESET
 	ILI9341_send_command(0x01);
 
-	// TODO utiliser votre module de delai pour 1 seconde
-	delay_us(1000000);
+	// TODO utiliser votre module de delai pour 1 seconde mettre OSdelay
+	osDelay(1000);
 
 	//POWER CONTROL A
 	ILI9341_send_command(LCD_POWERA);
@@ -183,7 +183,7 @@ void LCD_InitSerialInterface(void)
 	ILI9341_send_command(LCD_SLEEP_OUT);
 
 	// TODO utilisez votre module delai pour 120 ms
-	delay_us(120000);
+	osDelay(120);
 
 	//TURN ON DISPLAY
 	ILI9341_send_command(LCD_DISPLAY_ON);
@@ -192,16 +192,16 @@ void LCD_InitSerialInterface(void)
 	ILI9341_send_command(0x36);
 
 	// TODO utilisez votre module delai pour 2 ms
-	delay_us(2000);
+	osDelay(2);
 
 	ILI9341_send_data(0x80|0x08);
 }
 
 
-//Fonction pour écrire dans le frame buffer
+//Fonction pour ï¿½crire dans le frame buffer
 void LCD_CopyColorToFrameBuffer(uint16_t color)
 {
-	// on sépare le pixel en deux octets avant la copie dans le frame buffer (SPI est config pour octets)
+	// on sï¿½pare le pixel en deux octets avant la copie dans le frame buffer (SPI est config pour octets)
 	for(int i = 0; i < LCD_BUF_LEN_BYTES; i+=2)
 	{
 		frame_buffer_bytes[i] = (color >> 8); // MSB
@@ -230,7 +230,7 @@ void LCD_TransmitFrameBuffer_Personnaliser(void)
 }
 
 
-// Fonction pour écrire un caractère en bitmap (Font16) au pixel _cursorX _cursorY
+// Fonction pour ï¿½crire un caractï¿½re en bitmap (Font16) au pixel _cursorX _cursorY
 void LCD_WriteChar(uint8_t character, uint16_t backGroundColor, uint16_t charColor, uint16_t cursorX, uint16_t cursorY)
 {
 	uint32_t cursorXEnd = cursorX + CHAR_WIDTH_16 - 1;
@@ -243,28 +243,28 @@ void LCD_WriteChar(uint8_t character, uint16_t backGroundColor, uint16_t charCol
 	uint32_t tmp = 0;
 	uint16_t color = 0;
 
-	uint16_t asciiCharInFont16Array  = character - 32; // les caractères commencent à 32 dans la table ascii
+	uint16_t asciiCharInFont16Array  = character - 32; // les caractï¿½res commencent ï¿½ 32 dans la table ascii
 	uint16_t startingFontIndex       = asciiCharInFont16Array * CHAR_HEIGHT_16 * 2;
 
 	// on boucle dans le font et on replace les valeurs de couleur dans char_buff
 
-	// Chaque rangée fait 2 bytes dans Font16
+	// Chaque rangï¿½e fait 2 bytes dans Font16
 	for(int i = startingFontIndex; i < (startingFontIndex + (CHAR_HEIGHT_16 * 2)); i += 2)
 	{
-		// chaque rangée fait 2 bytes
+		// chaque rangï¿½e fait 2 bytes
 		rowMSB = Font16_Table[i];   // premier byte
-		rowLSB = Font16_Table[i+1]; // deuxième byte
+		rowLSB = Font16_Table[i+1]; // deuxiï¿½me byte
 
-		// on passe bit par bit pour vérifier s'il faut écrire un pixel de _charColor ou _backGroundColor
+		// on passe bit par bit pour vï¿½rifier s'il faut ï¿½crire un pixel de _charColor ou _backGroundColor
 		for(int j = 0; j < CHAR_WIDTH_16; j++)
 		{
 			row = (j < BITS_IN_BYTE) ? rowMSB : rowLSB;
 
-			// on calcule un bitmask qui passe dans la rangée de gauche à droite pour trouver les pixels à écrire
+			// on calcule un bitmask qui passe dans la rangï¿½e de gauche ï¿½ droite pour trouver les pixels ï¿½ ï¿½crire
 			uint16_t mask = 1 << (BITS_IN_BYTE - 1 - (j % BITS_IN_BYTE));
 			color = (row & mask) ? charColor : backGroundColor;
 
-			// on écrit à coup de 2 bytes, car spi est config pour des octets
+			// on ï¿½crit ï¿½ coup de 2 bytes, car spi est config pour des octets
 			tmp = j*2 + (CHAR_WIDTH_16 * row_index * 2);
 			char_buff[tmp] = (color >> 8);
 			char_buff[tmp + 1] = (uint8_t)color;
@@ -279,7 +279,7 @@ void LCD_WriteChar(uint8_t character, uint16_t backGroundColor, uint16_t charCol
 }
 
 
-// Cette fonction delimite un rectangle d'écriture de pixels
+// Cette fonction delimite un rectangle d'ï¿½criture de pixels
 // uint16_t X1 = colonne de debut
 // uint16_t X2 = colonne de fin
 // uint16_t Y1 = ligne de debut

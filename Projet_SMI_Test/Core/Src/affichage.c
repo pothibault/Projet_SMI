@@ -26,7 +26,7 @@ uint16_t isScreenOn = 0;    // 1 si l'�cran est allum�, 0 si �teint
 
 void AFFICHAGE_InitLcd(){
     	GPIO_clockActive();
-    	systick_init_1us();
+    	//systick_init_1us();
     	GPIO_init_pin_spi();
     	SPI_Module_Init();
     	LCD_InitSerialInterface();
