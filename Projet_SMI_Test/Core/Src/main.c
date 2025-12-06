@@ -19,12 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include <stm32f4xx.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
 #include "am2320.h"
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -123,6 +123,14 @@ extern float humidity = 20.0f; // Globale
 #define PWM_2V   55000		// ON
 #define HUMIDITY_THRESHOLD 10.0f	// Taux fixe
 
+int UneSeulFois = 1;
+int x = 20;
+int y = 0;
+uint16_t string_color = 0x0cf7;
+uint16_t background_color = 0x0;
+char Texte[] = "Taux d'humidite est:";
+char info[] = "80%";
+
 
 /* USER CODE END PV */
 
@@ -166,11 +174,12 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  AFFICHAGE_InitLcd();
+  LCD_CopyColorToFrameBuffer(0x07ed);
+  LCD_TransmitFrameBuffer();
   /* USER CODE END Init */
 
   /* Configure the system clock */
-  SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
 
@@ -253,6 +262,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -578,9 +588,6 @@ void StartReadHumidity(void *argument)
   /* USER CODE BEGIN StartReadHumidity */
   am2320_data_t meas;
 
-  // I2C déjà initialisé par MX_I2C1_Init(), mais on garde l'appel pour compatibilité
-  I2C1_init(0, 0);
-
   for(;;)
   {
 	  if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
@@ -629,10 +636,18 @@ void StartReadTouchLCD(void *argument)
 void StartSetLCDState(void *argument)
 {
   /* USER CODE BEGIN StartSetLCDState */
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+      if (UneSeulFois)
+      {
+          AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
+          AFFICHAGE_TraiterToutMot(info, 100, 100, string_color, background_color);
+          Affichage_DisplayHumidityBar(80, 20, 200, 200, 20);
+          UneSeulFois = 0;
+      }
+    osDelay(200);
   }
   /* USER CODE END StartSetLCDState */
 }
