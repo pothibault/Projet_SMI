@@ -20,6 +20,8 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include <stm32f4xx.h>
+#include <stdio.h> 
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -116,7 +118,7 @@ const osMutexAttr_t screenTouchMutex_attributes = {
 };
 /* USER CODE BEGIN PV */
 
-extern float humidity = 20.0f; // Globale
+float humidity = 20.0f; // Globale
 //#define PWM_1V   19800
 //#define PWM_2V   39700
 #define PWM_1V   27500		// OFF
@@ -174,6 +176,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  SystemClock_Config();
   AFFICHAGE_InitLcd();
   LCD_CopyColorToFrameBuffer(0x07ed);
   LCD_TransmitFrameBuffer();
@@ -591,19 +594,19 @@ void StartReadHumidity(void *argument)
   for(;;)
   {
 	  if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
-	  	  {
-			if (am2320_read(&meas)) {
+	  {
+        if (am2320_read(&meas)) {
 
-				float humidity_read = meas.humidity_rh;
-				float temperature = meas.temperature_c;
-				humidity = humidity_read;
-				osMutexRelease(humidityMutexHandle);
-				osDelay(2000);
-			  // TODO : stocker meas.temperature_c et meas.humidity_rh
-			  // par exemple dans des variables globales protégées par un mutex,
-			  // ou les envoyer dans une queue à une autre tâche qui gère l’affichage.
-			}
-	  	  }
+          float humidity_read = meas.humidity_rh;
+          float temperature = meas.temperature_c;
+          humidity = humidity_read;
+          
+        }
+        
+        osMutexRelease(humidityMutexHandle);
+	  }
+
+    osDelay(2000);
   }
   /* USER CODE END StartReadHumidity */
 }
@@ -635,22 +638,33 @@ void StartReadTouchLCD(void *argument)
 /* USER CODE END Header_StartSetLCDState */
 void StartSetLCDState(void *argument)
 {
-  /* USER CODE BEGIN StartSetLCDState */
+    char humidityText[16];
+    float localHumidity = 0.0f;
 
-  /* Infinite loop */
-  for(;;)
-  {
-      if (UneSeulFois)
-      {
-          AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
-          AFFICHAGE_TraiterToutMot(info, 100, 100, string_color, background_color);
-          Affichage_DisplayHumidityBar(80, 20, 200, 200, 20);
-          UneSeulFois = 0;
-      }
-    osDelay(200);
-  }
-  /* USER CODE END StartSetLCDState */
+    for(;;)
+    {
+        if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
+        {
+            localHumidity = humidity;
+            osMutexRelease(humidityMutexHandle);
+        }
+
+        //Formater en texte "xx.x%"
+        snprintf(humidityText, sizeof(humidityText), "%.1f%%", localHumidity);
+
+        //Afficher le texte et la barre
+        AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
+        AFFICHAGE_TraiterToutMot(humidityText, 100, 100, string_color, background_color);
+
+        Affichage_DisplayHumidityBar((int)localHumidity, 20, 200, 200, 20);
+
+        // 4) Attendre avant la prochaine mise à jour (par ex. toutes les 1s)
+        osDelay(1000); // 1000 ms = 1 seconde
+    }
 }
+
+
+/* USER CODE END StartSetLCDState */
 
 /* CallbackTouchTimer function */
 void CallbackTouchTimer(void *argument)
