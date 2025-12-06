@@ -1,24 +1,28 @@
-14:20:13 **** Incremental Build of configuration Debug for project Projet_SMI_Test ****
+14:34:56 **** Incremental Build of configuration Debug for project Projet_SMI_Test ****
 make -j8 all 
 arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F429xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
-../Core/Src/main.c:102:14: warning: 'humidity' initialized and declared 'extern'
-  102 | extern float humidity = 60.0f; // updated by your I2C task
+../Core/Src/main.c:119:14: warning: 'humidity' initialized and declared 'extern'
+  119 | extern float humidity = 20.0f; // Globale
       |              ^~~~~~~~
-../Core/Src/main.c: In function 'StartSetPWM':
-../Core/Src/main.c:522:26: warning: unused variable 'arr' [-Wunused-variable]
-  522 |                 uint32_t arr = TIM4->ARR;
-      |                          ^~~
+../Core/Src/main.c: In function 'StartReadHumidity':
+../Core/Src/main.c:582:3: warning: implicit declaration of function 'I2C1_init'; did you mean 'MX_I2C1_Init'? [-Wimplicit-function-declaration]
+  582 |   I2C1_init(0, 0);
+      |   ^~~~~~~~~
+      |   MX_I2C1_Init
+../Core/Src/main.c:591:39: warning: unused variable 'temperature' [-Wunused-variable]
+  591 |                                 float temperature = meas.temperature_c;
+      |                                       ^~~~~~~~~~~
 arm-none-eabi-gcc -o "Projet_SMI_Test.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Users\Alex_\git\Projet_SMI\Projet_SMI_Test\STM32F429ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Projet_SMI_Test.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 Finished building target: Projet_SMI_Test.elf
  
 arm-none-eabi-size  Projet_SMI_Test.elf 
 arm-none-eabi-objdump -h -S Projet_SMI_Test.elf  > "Projet_SMI_Test.list"
    text	   data	    bss	    dec	    hex	filename
-  33416	     20	  20596	  54032	   d310	Projet_SMI_Test.elf
+  31416	     20	  20612	  52048	   cb50	Projet_SMI_Test.elf
 Finished building: default.size.stdout
  
 Finished building: Projet_SMI_Test.list
  
 
-14:20:16 Build Finished. 0 errors, 2 warnings. (took 2s.129ms)
+14:34:57 Build Finished. 0 errors, 3 warnings. (took 1s.443ms)
 

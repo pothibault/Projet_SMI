@@ -19,11 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "am2320.h"
-#include "i2c.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include "am2320.h"
 
 /* USER CODE END Includes */
 
@@ -89,24 +89,39 @@ const osThreadAttr_t setLCDState_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
-/* Definitions for sleepTimer */
-osTimerId_t sleepTimerHandle;
-const osTimerAttr_t sleepTimer_attributes = {
-  .name = "sleepTimer"
+/* Definitions for touchTImer */
+osTimerId_t touchTImerHandle;
+const osTimerAttr_t touchTImer_attributes = {
+  .name = "touchTImer"
+};
+/* Definitions for runTime */
+osTimerId_t runTimeHandle;
+const osTimerAttr_t runTime_attributes = {
+  .name = "runTime"
 };
 /* Definitions for BlinkTurnMutex */
 osMutexId_t BlinkTurnMutexHandle;
 const osMutexAttr_t BlinkTurnMutex_attributes = {
   .name = "BlinkTurnMutex"
 };
+/* Definitions for humidityMutex */
+osMutexId_t humidityMutexHandle;
+const osMutexAttr_t humidityMutex_attributes = {
+  .name = "humidityMutex"
+};
+/* Definitions for screenTouchMutex */
+osMutexId_t screenTouchMutexHandle;
+const osMutexAttr_t screenTouchMutex_attributes = {
+  .name = "screenTouchMutex"
+};
 /* USER CODE BEGIN PV */
 
-extern float humidity = 60.0f; // updated by your I2C task
+extern float humidity = 20.0f; // Globale
 //#define PWM_1V   19800
 //#define PWM_2V   39700
-#define PWM_1V   27500
-#define PWM_2V   55000
-#define HUMIDITY_THRESHOLD 40.0f  // choose your switch point
+#define PWM_1V   27500		// OFF
+#define PWM_2V   55000		// ON
+#define HUMIDITY_THRESHOLD 10.0f	// Taux fixe
 
 
 /* USER CODE END PV */
@@ -122,7 +137,8 @@ void StartSetPWM(void *argument);
 void StartReadHumidity(void *argument);
 void StartReadTouchLCD(void *argument);
 void StartSetLCDState(void *argument);
-void CallbackSleepTimer(void *argument);
+void CallbackTouchTimer(void *argument);
+void CallbackRunTimer(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -174,6 +190,12 @@ int main(void)
   /* creation of BlinkTurnMutex */
   BlinkTurnMutexHandle = osMutexNew(&BlinkTurnMutex_attributes);
 
+  /* creation of humidityMutex */
+  humidityMutexHandle = osMutexNew(&humidityMutex_attributes);
+
+  /* creation of screenTouchMutex */
+  screenTouchMutexHandle = osMutexNew(&screenTouchMutex_attributes);
+
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
@@ -183,8 +205,11 @@ int main(void)
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* Create the timer(s) */
-  /* creation of sleepTimer */
-  sleepTimerHandle = osTimerNew(CallbackSleepTimer, osTimerOnce, NULL, &sleepTimer_attributes);
+  /* creation of touchTImer */
+  touchTImerHandle = osTimerNew(CallbackTouchTimer, osTimerOnce, NULL, &touchTImer_attributes);
+
+  /* creation of runTime */
+  runTimeHandle = osTimerNew(CallbackRunTimer, osTimerOnce, NULL, &runTime_attributes);
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
@@ -503,30 +528,40 @@ void StartBlinkRedTask(void *argument)
 void StartSetPWM(void *argument)
 {
   /* USER CODE BEGIN StartSetPWM */
-  /* Infinite loop */
-	// Start PWM on TIM4 CH1
+	/* Start PWM */
 	    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 
-	    for(;;)
+	    /* Force initial output = 1V */
+	    TIM4->CCR1 = PWM_1V;
+
+	    const uint32_t UPDATE_INTERVAL = 10000; // 15 minutes in ms
+	    static uint32_t lastUpdate = 0;
+
+	    for (;;)
 	    {
-	        uint16_t duty;
+	        uint32_t now = osKernelGetTickCount();
 
-	        if (humidity < HUMIDITY_THRESHOLD)
+	        if ((now - lastUpdate) >= UPDATE_INTERVAL)
 	        {
-	            duty = PWM_1V;    // output ≈ 1V
+	            // 15 minutes elapsed → allowed to update PWM
+	            if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
+	            {
+	                uint16_t duty;
+
+	                if (humidity < HUMIDITY_THRESHOLD)
+	                    duty = PWM_1V;
+	                else
+	                    duty = PWM_2V;
+
+	                TIM4->CCR1 = duty;
+
+	                osMutexRelease(humidityMutexHandle);
+	            }
+
+	            lastUpdate = now;
 	        }
-	        else
-	        {
-	            duty = PWM_2V;    // output ≈ 2V
-	        }
 
-	        TIM4->CCR1 = duty;
-	        uint32_t arr = TIM4->ARR;
-
-	        //TIM4->CCR1 = 65535;
-
-
-	        osDelay(200); // update 5 times per second
+	        osDelay(1000); // check once per second (cheap and safe)
 	    }
   /* USER CODE END StartSetPWM */
 }
@@ -548,17 +583,20 @@ void StartReadHumidity(void *argument)
 
   for(;;)
   {
-    if (am2320_read(&meas)) {
+	  if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
+	  	  {
+			if (am2320_read(&meas)) {
 
-    	float humidity_read = meas.humidity_rh;
-		float temperature = meas.temperature_c;
-		humidity = humidity_read;
-		osDelay(2000);
-      // TODO : stocker meas.temperature_c et meas.humidity_rh
-      // par exemple dans des variables globales protégées par un mutex,
-      // ou les envoyer dans une queue à une autre tâche qui gère l’affichage.
-    }
-
+				float humidity_read = meas.humidity_rh;
+				float temperature = meas.temperature_c;
+				humidity = humidity_read;
+				osMutexRelease(humidityMutexHandle);
+				osDelay(2000);
+			  // TODO : stocker meas.temperature_c et meas.humidity_rh
+			  // par exemple dans des variables globales protégées par un mutex,
+			  // ou les envoyer dans une queue à une autre tâche qui gère l’affichage.
+			}
+	  	  }
   }
   /* USER CODE END StartReadHumidity */
 }
@@ -599,12 +637,20 @@ void StartSetLCDState(void *argument)
   /* USER CODE END StartSetLCDState */
 }
 
-/* CallbackSleepTimer function */
-void CallbackSleepTimer(void *argument)
+/* CallbackTouchTimer function */
+void CallbackTouchTimer(void *argument)
 {
-  /* USER CODE BEGIN CallbackSleepTimer */
+  /* USER CODE BEGIN CallbackTouchTimer */
 
-  /* USER CODE END CallbackSleepTimer */
+  /* USER CODE END CallbackTouchTimer */
+}
+
+/* CallbackRunTimer function */
+void CallbackRunTimer(void *argument)
+{
+  /* USER CODE BEGIN CallbackRunTimer */
+
+  /* USER CODE END CallbackRunTimer */
 }
 
 /**
