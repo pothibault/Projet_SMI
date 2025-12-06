@@ -550,8 +550,9 @@ void StartReadHumidity(void *argument)
   {
     if (am2320_read(&meas)) {
 
-    	float humidity = meas.humidity_rh;
+    	float humidity_read = meas.humidity_rh;
 		float temperature = meas.temperature_c;
+		humidity = humidity_read;
 		osDelay(2000);
       // TODO : stocker meas.temperature_c et meas.humidity_rh
       // par exemple dans des variables globales protégées par un mutex,
