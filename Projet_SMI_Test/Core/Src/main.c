@@ -19,10 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include <stm32f4xx.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -106,6 +106,14 @@ extern float humidity = 60.0f; // updated by your I2C task
 #define PWM_2V   55000
 #define HUMIDITY_THRESHOLD 40.0f  // choose your switch point
 
+int UneSeulFois = 1;
+int x = 20;
+int y = 0;
+uint16_t string_color = 0x0cf7;
+uint16_t background_color = 0x0;
+char Texte[] = "Taux d'humidite est:";
+char info[] = "80%";
+
 
 /* USER CODE END PV */
 
@@ -148,11 +156,12 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  AFFICHAGE_InitLcd();
+  LCD_CopyColorToFrameBuffer(0x07ed);
+  LCD_TransmitFrameBuffer();
   /* USER CODE END Init */
 
   /* Configure the system clock */
-  SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
 
@@ -226,6 +235,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -503,28 +513,28 @@ void StartSetPWM(void *argument)
   /* USER CODE BEGIN StartSetPWM */
   /* Infinite loop */
 	// Start PWM on TIM4 CH1
-	    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+//	    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 
 	    for(;;)
 	    {
-	        uint16_t duty;
+//	        uint16_t duty;
+//
+//	        if (humidity < HUMIDITY_THRESHOLD)
+//	        {
+//	            duty = PWM_1V;    // output ≈ 1V
+//	        }
+//	        else
+//	        {
+//	            duty = PWM_2V;    // output ≈ 2V
+//	        }
+//
+//	        TIM4->CCR1 = duty;
+//	        uint32_t arr = TIM4->ARR;
+//
+//	        //TIM4->CCR1 = 65535;
 
-	        if (humidity < HUMIDITY_THRESHOLD)
-	        {
-	            duty = PWM_1V;    // output ≈ 1V
-	        }
-	        else
-	        {
-	            duty = PWM_2V;    // output ≈ 2V
-	        }
 
-	        TIM4->CCR1 = duty;
-	        uint32_t arr = TIM4->ARR;
-
-	        //TIM4->CCR1 = 65535;
-
-
-	        osDelay(200); // update 5 times per second
+	        osDelay(1); // update 5 times per second
 	    }
   /* USER CODE END StartSetPWM */
 }
@@ -575,10 +585,18 @@ void StartReadTouchLCD(void *argument)
 void StartSetLCDState(void *argument)
 {
   /* USER CODE BEGIN StartSetLCDState */
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+      if (UneSeulFois)
+      {
+          AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
+          AFFICHAGE_TraiterToutMot(info, 100, 100, string_color, background_color);
+          Affichage_DisplayHumidityBar(80, 20, 200, 200, 20);
+          UneSeulFois = 0;
+      }
+    osDelay(200);
   }
   /* USER CODE END StartSetLCDState */
 }
