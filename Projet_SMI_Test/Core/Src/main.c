@@ -123,7 +123,7 @@ float humidity = 20.0f; // Globale
 //#define PWM_2V   39700
 #define PWM_1V   27500		// OFF
 #define PWM_2V   55000		// ON
-#define HUMIDITY_THRESHOLD 10.0f	// Taux fixe
+#define HUMIDITY_THRESHOLD 50.0f	// Taux fixe
 
 int UneSeulFois = 1;
 int x = 20;
