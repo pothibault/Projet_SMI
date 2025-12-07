@@ -598,7 +598,7 @@ void StartSetPWM(void *argument)
 	    /* Force initial output = 1V */
 	    TIM4->CCR1 = PWM_1V;
 
-	    const uint32_t UPDATE_INTERVAL = 20000; // 15 minutes in ms
+	    const uint32_t UPDATE_INTERVAL = 900000; // 15 minutes in ms
 	    static uint32_t lastUpdate = 0;
 
 	    for (;;)
@@ -607,7 +607,6 @@ void StartSetPWM(void *argument)
 
 	        if ((now - lastUpdate) >= UPDATE_INTERVAL)
 	        {
-	            // 15 minutes elapsed → allowed to update PWM
 	            if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
 	            {
 	                uint16_t duty;
@@ -625,7 +624,7 @@ void StartSetPWM(void *argument)
 	            lastUpdate = now;
 	        }
 
-	        osDelay(1000); // check once per second (cheap and safe)
+	        osDelay(1000); 
 	    }
   /* USER CODE END StartSetPWM */
 }
