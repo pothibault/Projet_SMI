@@ -20,7 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include <stm32f4xx.h>
-#include <stdio.h> 
+#include <stdio.h>
 
 
 /* Private includes ----------------------------------------------------------*/
@@ -132,6 +132,7 @@ uint16_t string_color = 0x0cf7;
 uint16_t background_color = 0x0;
 char Texte[] = "Taux d'humidite est:";
 char info[] = "80%";
+int Pret_pour_ecrire = 0;
 
 
 /* USER CODE END PV */
@@ -509,11 +510,34 @@ static void MX_GPIO_Init(void)
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
+  /* Configure GPIO pin Input : PA0 (Button) */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;  // interruption sur front montant
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;         // pull-down (adapter selon votre montage)
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* Enable EXTI0 interrupt */
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);  // priorité compatible FreeRTOS
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
   /* USER CODE END MX_GPIO_Init_2 */
+
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_0) {
+        // Debounce simple (50 ms)
+        static uint32_t lastPress = 0;
+        uint32_t now = HAL_GetTick();
+        if (now - lastPress < 50) return;
+        lastPress = now;
 
+        // Signaler la tâche readTouchLCD pour s'exécuter
+        osThreadFlagsSet(readTouchLCDHandle, 1);
+    }
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartBlinkGreenTask */
@@ -670,14 +694,39 @@ void StartReadHumidity(void *argument)
 /* USER CODE END Header_StartReadTouchLCD */
 void StartReadTouchLCD(void *argument)
 {
-  /* USER CODE BEGIN StartReadTouchLCD */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartReadTouchLCD */
+    int EtatEcran = 0;
+    uint32_t tempsDepare = 0;
+
+    for (;;)
+    {
+        // Attente du flag envoyé par l’EXTI
+        osThreadFlagsWait(1, osFlagsWaitAny, osWaitForever);
+
+        // ---- Appui bouton détecté ----
+        EtatEcran ^= 1;
+
+        if (EtatEcran)
+        {
+            LCD_CopyColorToFrameBuffer(0x07ed);
+            LCD_TransmitFrameBuffer();
+            tempsDepare = HAL_GetTick();
+        }
+        else
+        {
+            LCD_CopyColorToFrameBuffer(0x0);
+            LCD_TransmitFrameBuffer();
+        }
+
+        // Éteindre automatiquement après 30 s
+        if (EtatEcran && (HAL_GetTick() - tempsDepare >= 30000))
+        {
+            LCD_CopyColorToFrameBuffer(0x0);
+            LCD_TransmitFrameBuffer();
+            EtatEcran = 0;
+        }
+    }
 }
+
 
 /* USER CODE BEGIN Header_StartSetLCDState */
 /**
@@ -702,11 +751,13 @@ void StartSetLCDState(void *argument)
         //Formater en texte "xx.x%"
         floatToChar(humidity, humidityText);
 
-        //Afficher le texte et la barre
-        AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
-        AFFICHAGE_TraiterToutMot(humidityText, 100, 100, string_color, background_color);
+        if (Pret_pour_ecrire){
+            //Afficher le texte et la barre
+            AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
+            AFFICHAGE_TraiterToutMot(humidityText, 100, 100, string_color, background_color);
 
-        Affichage_DisplayHumidityBar((int)localHumidity, 20, 200, 200, 20);
+            Affichage_DisplayHumidityBar((int)localHumidity, 20, 200, 200, 20);
+        }
 
         // 4) Attendre avant la prochaine mise à jour (par ex. toutes les 1s)
         osDelay(1000); // 1000 ms = 1 seconde
