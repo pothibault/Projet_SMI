@@ -20,7 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include <stm32f4xx.h>
-#include <stdio.h> 
+#include <stdio.h>
 
 
 /* Private includes ----------------------------------------------------------*/
@@ -131,7 +131,10 @@ int y = 0;
 uint16_t string_color = 0x0cf7;
 uint16_t background_color = 0x0;
 char Texte[] = "Taux d'humidite est:";
-char info[] = "80%";
+int Pret_pour_ecrire;
+uint32_t tempsDepare = 0;
+int EtatEcran = 0;
+int timerStarted = 0;
 
 
 /* USER CODE END PV */
@@ -208,6 +211,16 @@ void floatToChar(float value, char *buffer)
     *buffer = '\0';
 }
 
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_0)
+    {
+        osThreadFlagsSet(readTouchLCDHandle, 1);
+    }
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -229,7 +242,7 @@ int main(void)
   /* USER CODE BEGIN Init */
   SystemClock_Config();
   AFFICHAGE_InitLcd();
-  LCD_CopyColorToFrameBuffer(0x07ed);
+  LCD_CopyColorToFrameBuffer(0x0000);
   LCD_TransmitFrameBuffer();
   /* USER CODE END Init */
 
@@ -492,13 +505,19 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_13|GPIO_PIN_14, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PG13 PG14 */
   GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14;
@@ -507,9 +526,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
+  /* Configure GPIO pin Input : PA0 (Button) */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;  // interruption sur front montant
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;         // pull-down (adapter selon votre montage)
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* Enable EXTI0 interrupt */
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);  // priorité compatible FreeRTOS
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
   /* USER CODE END MX_GPIO_Init_2 */
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -671,13 +705,38 @@ void StartReadHumidity(void *argument)
 void StartReadTouchLCD(void *argument)
 {
   /* USER CODE BEGIN StartReadTouchLCD */
+
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+    for(;;)
+    {
+        osThreadFlagsWait(1, osFlagsWaitAny, osWaitForever);
+
+        // ---- Appui bouton detecte ----
+        EtatEcran ^= 1;
+
+        if (EtatEcran)
+        {
+            if (timerStarted == 0)
+            {
+        		LCD_CopyColorToFrameBuffer(0x07ed);
+                LCD_TransmitFrameBuffer();
+                tempsDepare = HAL_GetTick();
+                timerStarted = 1;
+                Pret_pour_ecrire = 1;
+            }
+        }
+        else
+        {
+        	Pret_pour_ecrire = 0;
+        	LCD_CopyColorToFrameBuffer(0x0000);
+            LCD_TransmitFrameBuffer();
+            timerStarted = 0;
+        }
+
+    }
   /* USER CODE END StartReadTouchLCD */
 }
+
 
 /* USER CODE BEGIN Header_StartSetLCDState */
 /**
@@ -688,11 +747,12 @@ void StartReadTouchLCD(void *argument)
 /* USER CODE END Header_StartSetLCDState */
 void StartSetLCDState(void *argument)
 {
+  /* USER CODE BEGIN StartSetLCDState */
     char humidityText[16];
     float localHumidity = 0.0f;
-
-    for(;;)
-    {
+    /* Infinite loop */
+  for(;;)
+  {
         if (osMutexAcquire(humidityMutexHandle, osWaitForever) == osOK)
         {
             localHumidity = humidity;
@@ -702,19 +762,27 @@ void StartSetLCDState(void *argument)
         //Formater en texte "xx.x%"
         floatToChar(humidity, humidityText);
 
-        //Afficher le texte et la barre
-        AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
-        AFFICHAGE_TraiterToutMot(humidityText, 100, 100, string_color, background_color);
+		// eteindre automatiquement apres 10s
+		if (EtatEcran && timerStarted && (HAL_GetTick() - tempsDepare >= 10000))
+		{
+			Pret_pour_ecrire = 0;
+			LCD_CopyColorToFrameBuffer(0x0000);
+			LCD_TransmitFrameBuffer();
+			EtatEcran = 0;
+			timerStarted = 0;
+		}
+        if(Pret_pour_ecrire){
+            //Afficher le texte et la barre
+            AFFICHAGE_TraiterToutMot(Texte, 5, 10, string_color, background_color);
+            AFFICHAGE_TraiterToutMot(humidityText, 100, 100, string_color, background_color);
 
-        Affichage_DisplayHumidityBar((int)localHumidity, 20, 200, 200, 20);
-
+            Affichage_DisplayHumidityBar((int)localHumidity, 20, 200, 200, 20);
+        }
         // 4) Attendre avant la prochaine mise à jour (par ex. toutes les 1s)
         osDelay(1000); // 1000 ms = 1 seconde
     }
+      /* USER CODE END StartSetLCDState */
 }
-
-
-/* USER CODE END StartSetLCDState */
 
 /* CallbackTouchTimer function */
 void CallbackTouchTimer(void *argument)
